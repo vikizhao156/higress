@@ -121,6 +121,12 @@ func NewClient(clientConfig clientcmd.ClientConfig) (Client, error) {
 	c.higressInformer = higressinformer.NewSharedInformerFactory(c.higress, resyncInterval)
 
 	c.kingress, err = kingressclient.NewForConfig(istioClient.RESTConfig())
+
+	if err != nil {
+		return nil, err
+	}
+	c.kingressInformer = kingressinformer.NewSharedInformerFactory(c.kingress,  resyncInterval)
+
 	return &c, nil
 }
 
@@ -143,6 +149,7 @@ func (c *client) HigressInformer() higressinformer.SharedInformerFactory {
 func (c *client) RunAndWait(stop <-chan struct{}) {
 	c.Client.RunAndWait(stop)
 	c.higressInformer.Start(stop)
+	c.kingressInformer.Start(stop)
 	if c.fastSync {
 		fastWaitForCacheSync(stop, c.higressInformer)
 		_ = wait.PollImmediate(time.Microsecond*100, wait.ForeverTestTimeout, func() (bool, error) {
@@ -158,6 +165,22 @@ func (c *client) RunAndWait(stop <-chan struct{}) {
 		})
 	} else {
 		c.higressInformer.WaitForCacheSync(stop)
+	}
+	if c.fastSync {
+		fastWaitForCacheSync(stop, c.kingressInformer)
+		_ = wait.PollImmediate(time.Microsecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+			select {
+			case <-stop:
+				return false, fmt.Errorf("channel closed")
+			default:
+			}
+			if c.informerWatchesPending.Load() == 0 {
+				return true, nil
+			}
+			return false, nil
+		})
+	} else {
+		c.kingressInformer.WaitForCacheSync(stop)
 	}
 }
 

@@ -45,7 +45,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	kset "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/informers/networking/v1beta1"
 	listerv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -61,7 +60,6 @@ type controller struct {
 	queue                   workqueue.RateLimitingInterface
 	virtualServiceHandlers  []model.EventHandler
 	gatewayHandlers         []model.EventHandler
-	destinationRuleHandlers []model.EventHandler
 	envoyFilterHandlers     []model.EventHandler
 
 	options common.Options
@@ -70,13 +68,10 @@ type controller struct {
 	// key: namespace/name
 	ingresses map[string]*ingress.Ingress
 
-	ingressInformer cache.SharedInformer
-	ingressLister   networkingv1alpha1.IngressLister
-	serviceInformer cache.SharedInformer
-	serviceLister   listerv1.ServiceLister
-	// May be nil if ingress class is not supported in the cluster
-	classes v1beta1.IngressClassInformer
-
+	ingressInformer  cache.SharedInformer
+	ingressLister    networkingv1alpha1.IngressLister
+	serviceInformer  cache.SharedInformer
+	serviceLister    listerv1.ServiceLister
 	secretController secret.SecretController
 }
 
@@ -89,21 +84,12 @@ func NewController(localKubeClient, client kube.Client, options common.Options,
 	ingressInformer := client.KingressInformer().Networking().V1alpha1().Ingresses()
 	serviceInformer := client.KubeInformer().Core().V1().Services()
 
-	var classes v1beta1.IngressClassInformer
-	if common.NetworkingIngressAvailable(client) {
-		classes = client.KubeInformer().Networking().V1beta1().IngressClasses()
-		_ = classes.Informer()
-	} else {
-		IngressLog.Infof("Skipping IngressClass, resource not supported for cluster %s", options.ClusterId)
-	}
-
 	c := &controller{
 		options:          options,
 		queue:            q,
 		ingresses:        make(map[string]*ingress.Ingress),
 		ingressInformer:  ingressInformer.Informer(),
 		ingressLister:    ingressInformer.Lister(),
-		classes:          classes,
 		serviceInformer:  serviceInformer.Informer(),
 		serviceLister:    serviceInformer.Lister(),
 		secretController: secretController,
@@ -191,13 +177,6 @@ func (c *controller) onEvent(namespacedName types.NamespacedName) error {
 		}
 	}
 
-	drmetadata := config.Meta{
-		Name:             ing.Name + "-" + "destinationrule",
-		Namespace:        ing.Namespace,
-		GroupVersionKind: gvk.DestinationRule,
-		// Set this label so that we do not compare configs and just push.
-		Labels: map[string]string{constants.AlwaysPushLabel: "true"},
-	}
 	vsmetadata := config.Meta{
 		Name:             ing.Name + "-" + "virtualservice",
 		Namespace:        ing.Namespace,
@@ -218,10 +197,6 @@ func (c *controller) onEvent(namespacedName types.NamespacedName) error {
 		GroupVersionKind: gvk.Gateway,
 		// Set this label so that we do not compare configs and just push.
 		Labels: map[string]string{constants.AlwaysPushLabel: "true"},
-	}
-
-	for _, f := range c.destinationRuleHandlers {
-		f(config.Config{Meta: drmetadata}, config.Config{Meta: drmetadata}, event)
 	}
 
 	for _, f := range c.virtualServiceHandlers {
@@ -245,8 +220,6 @@ func (c *controller) RegisterEventHandler(kind config.GroupVersionKind, f model.
 		c.virtualServiceHandlers = append(c.virtualServiceHandlers, f)
 	case gvk.Gateway:
 		c.gatewayHandlers = append(c.gatewayHandlers, f)
-	case gvk.DestinationRule:
-		c.destinationRuleHandlers = append(c.destinationRuleHandlers, f)
 	case gvk.EnvoyFilter:
 		c.envoyFilterHandlers = append(c.envoyFilterHandlers, f)
 	}
@@ -263,18 +236,13 @@ func (c *controller) SetWatchErrorHandler(handler func(r *cache.Reflector, err e
 	if err := c.secretController.Informer().SetWatchErrorHandler(handler); err != nil {
 		errs = multierror.Append(errs, err)
 	}
-	if c.classes != nil {
-		if err := c.classes.Informer().SetWatchErrorHandler(handler); err != nil {
-			errs = multierror.Append(errs, err)
-		}
-	}
 	return errs
 }
 
 func (c *controller) HasSynced() bool {
-	return c.ingressInformer.HasSynced() && c.serviceInformer.HasSynced() &&
-		(c.classes == nil || c.classes.Informer().HasSynced()) &&
-		c.secretController.HasSynced()
+    IngressLog.Infof("ingressInformer",c.ingressInformer.HasSynced(),"\n")
+    return c.ingressInformer.HasSynced() && c.serviceInformer.HasSynced() && c.secretController.HasSynced()
+    //eturn  c.serviceInformer.HasSynced() && c.secretController.HasSynced()
 }
 
 func (c *controller) List() []config.Config {
@@ -341,10 +309,6 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 		return fmt.Errorf("wrapperConfig is nil")
 	}
 
-	// Ignore canary config.
-	if wrapper.AnnotationsConfig.IsCanary() {
-		return nil
-	}
 	cfg := wrapper.Config
 	kingressv1alpha1, ok := cfg.Spec.(ingress.IngressSpec)
 
@@ -356,9 +320,8 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 		common.IncrementInvalidIngress(c.options.ClusterId, common.EmptyRule)
 		return fmt.Errorf("invalid ingress rule %s:%s in cluster %s, `rules` must be specified", cfg.Namespace, cfg.Name, c.options.ClusterId)
 	}
-
-	//ruleHost: Kingress的rule可以对多条Host生效，此处多做一遍
-	// 当Knative开启AutoTLS时 需要校验
+	// ruleHost: Kingress的rule可以对多条Host生效，此处多做一遍
+	// 当Knative开启AutoTLS时 需要校验HTTPOption 字段，如果HTTPOption开启了Redirect，则需要搞一个Redirect的server用来传301
 	for _, rule := range kingressv1alpha1.Rules {
 		for _, ruleHost := range rule.Hosts {
 			cleanHost := common.CleanHost(ruleHost)
@@ -370,7 +333,6 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 				Ingress:   cfg,
 				Event:     common.Normal,
 			}
-
 			// Extract the previous gateway and builder
 			wrapperGateway, exist := convertOptions.Gateways[ruleHost]
 			preDomainBuilder, _ := convertOptions.IngressDomainCache.Valid[ruleHost]
@@ -401,6 +363,22 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 				// Fallback to get downstream tls from current ingress.
 				if wrapperGateway.WrapperConfig.AnnotationsConfig.DownstreamTLS == nil {
 					wrapperGateway.WrapperConfig.AnnotationsConfig.DownstreamTLS = wrapper.AnnotationsConfig.DownstreamTLS
+				}
+			}
+			//增加HTTP Option的301重定向功能
+			if isIngressPublic(&kingressv1alpha1) && (kingressv1alpha1.HTTPOption == ingress.HTTPOptionRedirected) {
+				for _, server := range wrapperGateway.Gateway.Servers {
+					if protocol.Parse(server.Port.Protocol).IsHTTP() {
+						server.Tls = &networking.ServerTLSSettings{
+							HttpsRedirect: true,
+						}
+					}
+				}
+			} else if isIngressPublic(&kingressv1alpha1) && (kingressv1alpha1.HTTPOption == ingress.HTTPOptionEnabled) {
+				for _, server := range wrapperGateway.Gateway.Servers {
+					if protocol.Parse(server.Port.Protocol).IsHTTP() {
+						server.Tls = nil
+					}
 				}
 			}
 
@@ -610,21 +588,6 @@ func (c *controller) IngressRouteBuilderServicesCheck(httppath *ingress.HTTPIngr
 	return common.Normal
 }
 
-func (c *controller) ConvertTrafficPolicy(convertOptions *common.ConvertOptions, wrapper *common.WrapperConfig) error {
-	if convertOptions == nil {
-		return fmt.Errorf("convertOptions is nil")
-	}
-	if wrapper == nil {
-		return fmt.Errorf("wrapperConfig is nil")
-	}
-
-	if !wrapper.AnnotationsConfig.NeedTrafficPolicy() {
-		return nil
-	}
-
-	return nil
-}
-
 func resolveNamedPort(backend *ingress.IngressBackend, namespace string, serviceLister listerv1.ServiceLister) (int32, error) {
 	if backend == nil {
 		return 0, fmt.Errorf("ingressBackend is nil")
@@ -724,26 +687,6 @@ func (c *controller) shouldProcessIngressUpdate(ing *ingress.Ingress) (bool, err
 	return preProcessed, nil
 }
 
-func shouldReconcileTLS(ing *ingress.Ingress) bool {
-	return isIngressPublic(ing) && len(ing.Spec.TLS) > 0
-}
-
-func shouldReconcileHTTPServer(ing *ingress.Ingress) bool {
-	// We will create a Ingress specific HTTPServer when
-	// 1. auto TLS is enabled as in this case users want us to fully handle the TLS/HTTP behavior,
-	// 2. HTTPOption is set to Redirected as we don't have default HTTP server supporting HTTP redirection.
-	return isIngressPublic(ing) && (ing.Spec.HTTPOption == ingress.HTTPOptionRedirected || len(ing.Spec.TLS) > 0)
-}
-
-func isIngressPublic(ing *ingress.Ingress) bool {
-	for _, rule := range ing.Spec.Rules {
-		if rule.Visibility == ingress.IngressVisibilityExternalIP {
-			return true
-		}
-	}
-	return false
-}
-
 //use MakeMatch from net-istio
 /*
 func (c *controller) generateHttpMatches(pathType common.PathType, path string, wrapperVS *common.WrapperVirtualService) []*networking.HTTPMatchRequest {
@@ -820,4 +763,13 @@ func transformHosts(host string) kset.String {
 	out := kset.NewString()
 	out.Insert(hosts...)
 	return out
+}
+
+func isIngressPublic(ingSpec *ingress.IngressSpec) bool {
+	for _, rule := range ingSpec.Rules {
+		if rule.Visibility == ingress.IngressVisibilityExternalIP {
+			return true
+		}
+	}
+	return false
 }

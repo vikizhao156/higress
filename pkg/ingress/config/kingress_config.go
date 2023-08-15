@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-
+    "istio.io/pkg/log"
 	"github.com/gogo/protobuf/types"
 	extensions "istio.io/api/extensions/v1alpha1"
 	networking "istio.io/api/networking/v1alpha3"
@@ -68,13 +68,12 @@ type KIngressConfig struct {
 
 	localKubeClient kube.Client
 
-	virtualServiceHandlers  []model.EventHandler
-	gatewayHandlers         []model.EventHandler
-	destinationRuleHandlers []model.EventHandler
-	envoyFilterHandlers     []model.EventHandler
-	serviceEntryHandlers    []model.EventHandler
-	wasmPluginHandlers      []model.EventHandler
-	watchErrorHandler       cache.WatchErrorHandler
+	virtualServiceHandlers []model.EventHandler
+	gatewayHandlers        []model.EventHandler
+	envoyFilterHandlers    []model.EventHandler
+	serviceEntryHandlers   []model.EventHandler
+	wasmPluginHandlers     []model.EventHandler
+	watchErrorHandler      cache.WatchErrorHandler
 
 	cachedEnvoyFilters []config.Config
 
@@ -161,9 +160,6 @@ func (m *KIngressConfig) RegisterEventHandler(kind config.GroupVersionKind, f mo
 	case gvk.Gateway:
 		m.gatewayHandlers = append(m.gatewayHandlers, f)
 
-	case gvk.DestinationRule:
-		m.destinationRuleHandlers = append(m.destinationRuleHandlers, f)
-
 	case gvk.EnvoyFilter:
 		m.envoyFilterHandlers = append(m.envoyFilterHandlers, f)
 
@@ -192,20 +188,26 @@ func (m *KIngressConfig) AddLocalCluster(options common.Options) common.KIngress
 }
 
 func (m *KIngressConfig) InitializeCluster(ingressController common.KIngressController, stop <-chan struct{}) error {
+    log.Info("In InitializeCluster")
 	_ = ingressController.SetWatchErrorHandler(m.watchErrorHandler)
-
-	go ingressController.Run(stop)
+    log.Info("In InitializeCluster2")
+    go ingressController.Run(stop)
+    log.Info("In InitializeCluster3")
 	return nil
 }
 
 // 核心函数
 func (m *KIngressConfig) List(typ config.GroupVersionKind, namespace string) ([]config.Config, error) {
-	//调用与理解接口？
+    //调用与理解接口？
+    if typ == gvk.DestinationRule{
+        return nil,nil
+    }
 	if typ != gvk.Gateway &&
 		typ != gvk.VirtualService &&
 		typ != gvk.EnvoyFilter &&
 		typ != gvk.ServiceEntry &&
 		typ != gvk.WasmPlugin {
+        IngressLog.Infof("typ  %s Out Of Define",typ)
 		return nil, common.ErrUnsupportedOp
 	}
 
@@ -254,8 +256,6 @@ func (m *KIngressConfig) List(typ config.GroupVersionKind, namespace string) ([]
 		return m.convertGateways(wrapperConfigs), nil
 	case gvk.VirtualService:
 		return m.convertVirtualService(wrapperConfigs), nil
-	case gvk.DestinationRule:
-		return m.convertDestinationRule(wrapperConfigs), nil
 	case gvk.ServiceEntry:
 		return m.convertServiceEntry(wrapperConfigs), nil
 	case gvk.WasmPlugin:
@@ -451,7 +451,7 @@ func (m *KIngressConfig) convertVirtualService(configs []common.WrapperConfig) [
 	return out
 }
 
-// 确保split precent 总和为100
+// 确保split precent 总和为100, 如果不是100则按比例划分。
 func normalizeWeightedKCluster(cache *common.IngressRouteCache, route *common.WrapperHTTPRoute) {
 	if len(route.HTTPRoute.Route) == 1 {
 		route.HTTPRoute.Route[0].Weight = 100
@@ -463,7 +463,6 @@ func normalizeWeightedKCluster(cache *common.IngressRouteCache, route *common.Wr
 		if idx == 0 {
 			continue
 		}
-
 		weightTotal += routeDestination.Weight
 	}
 	var sum int32
@@ -581,79 +580,6 @@ func (m *KIngressConfig) convertServiceEntry([]common.WrapperConfig) []config.Co
 				CreationTimestamp: se.GetCreateTime(),
 			},
 			Spec: se.ServiceEntry,
-		})
-	}
-	return out
-}
-
-func (m *KIngressConfig) convertDestinationRule(configs []common.WrapperConfig) []config.Config {
-	convertOptions := common.ConvertOptions{
-		Service2TrafficPolicy: map[common.ServiceKey]*common.WrapperTrafficPolicy{},
-	}
-
-	// Convert destination from service within ingress rule.
-	for idx := range configs {
-		cfg := configs[idx]
-		clusterId := common.GetClusterId(cfg.Config.Annotations)
-		m.mutex.RLock()
-		ingressController := m.remoteIngressControllers[clusterId]
-		m.mutex.RUnlock()
-		if ingressController == nil {
-			continue
-		}
-		if err := ingressController.ConvertTrafficPolicy(&convertOptions, &cfg); err != nil {
-			IngressLog.Errorf("Convert ingress %s/%s to destination rule fail in cluster %s, err %v", cfg.Config.Namespace, cfg.Config.Name, clusterId, err)
-		}
-	}
-
-	IngressLog.Debugf("traffic policy number %d", len(convertOptions.Service2TrafficPolicy))
-
-	for _, wrapperTrafficPolicy := range convertOptions.Service2TrafficPolicy {
-		m.annotationHandler.ApplyTrafficPolicy(wrapperTrafficPolicy.TrafficPolicy, wrapperTrafficPolicy.PortTrafficPolicy, wrapperTrafficPolicy.WrapperConfig.AnnotationsConfig)
-	}
-
-	// Merge multi-port traffic policy per service into one destination rule.
-	destinationRules := map[string]*common.WrapperDestinationRule{}
-	for key, wrapperTrafficPolicy := range convertOptions.Service2TrafficPolicy {
-		var serviceName string
-		if key.ServiceFQDN != "" {
-			serviceName = key.ServiceFQDN
-		} else {
-			serviceName = util.CreateServiceFQDN(key.Namespace, key.Name)
-		}
-		dr, exist := destinationRules[serviceName]
-		if !exist {
-			trafficPolicy := &networking.TrafficPolicy{}
-			if wrapperTrafficPolicy.PortTrafficPolicy != nil {
-				trafficPolicy.PortLevelSettings = []*networking.TrafficPolicy_PortTrafficPolicy{wrapperTrafficPolicy.PortTrafficPolicy}
-			} else if wrapperTrafficPolicy.TrafficPolicy != nil {
-				trafficPolicy = wrapperTrafficPolicy.TrafficPolicy
-			}
-			dr = &common.WrapperDestinationRule{
-				DestinationRule: &networking.DestinationRule{
-					Host:          serviceName,
-					TrafficPolicy: trafficPolicy,
-				},
-				WrapperConfig: wrapperTrafficPolicy.WrapperConfig,
-				ServiceKey:    key,
-			}
-		} else if wrapperTrafficPolicy.PortTrafficPolicy != nil {
-			dr.DestinationRule.TrafficPolicy.PortLevelSettings = append(dr.DestinationRule.TrafficPolicy.PortLevelSettings, wrapperTrafficPolicy.PortTrafficPolicy)
-		}
-
-		destinationRules[serviceName] = dr
-	}
-
-	out := make([]config.Config, 0, len(destinationRules))
-	for _, dr := range destinationRules {
-		drName := util.CreateDestinationRuleName(m.clusterId, dr.ServiceKey.Namespace, dr.ServiceKey.Name)
-		out = append(out, config.Config{
-			Meta: config.Meta{
-				GroupVersionKind: gvk.DestinationRule,
-				Name:             common.CreateConvertedName(constants.IstioIngressGatewayName, drName),
-				Namespace:        m.namespace,
-			},
-			Spec: dr.DestinationRule,
 		})
 	}
 	return out
@@ -1204,9 +1130,13 @@ func (m *KIngressConfig) Run(stop <-chan struct{}) {
 }
 
 func (m *KIngressConfig) HasSynced() bool {
+    IngressLog.Info("In Kingress Synced.")
 	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+    defer m.mutex.RUnlock()
+    IngressLog.Info("In Kingress Synced---2.")
 	for _, remoteIngressController := range m.remoteIngressControllers {
+        IngressLog.Info("In Kingress Synced,",remoteIngressController)
+        IngressLog.Info("In Kingress Synced,",remoteIngressController.HasSynced())
 		if !remoteIngressController.HasSynced() {
 			return false
 		}
