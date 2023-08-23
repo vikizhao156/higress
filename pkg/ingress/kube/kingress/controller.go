@@ -79,6 +79,7 @@ type controller struct {
 	serviceInformer  cache.SharedInformer
 	serviceLister    listerv1.ServiceLister
 	secretController secret.SecretController
+	statusSyncer     *statusSyncer
 }
 
 // NewController creates a new Kubernetes controller
@@ -104,6 +105,12 @@ func NewController(localKubeClient, client kube.Client, options common.Options,
 	handler := controllers.LatestVersionHandlerFuncs(controllers.EnqueueForSelf(q))
 	c.ingressInformer.AddEventHandler(handler)
 
+	if options.EnableStatus {
+		c.statusSyncer = newStatusSyncer(localKubeClient, client, c, options.SystemNamespace)
+	} else {
+		IngressLog.Infof("Disable status update for cluster %s", options.ClusterId)
+	}
+
 	return c
 }
 
@@ -116,6 +123,9 @@ func (c *controller) SecretLister() listerv1.SecretLister {
 }
 
 func (c *controller) Run(stop <-chan struct{}) {
+	if c.statusSyncer != nil {
+		go c.statusSyncer.run(stop)
+	}
 	go c.secretController.Run(stop)
 
 	defer utilruntime.HandleCrash()
@@ -153,6 +163,7 @@ func (c *controller) processNextWorkItem() bool {
 func (c *controller) onEvent(namespacedName types.NamespacedName) error {
 	event := model.EventUpdate
 	ing, err := c.ingressLister.Ingresses(namespacedName.Namespace).Get(namespacedName.Name)
+	ing.Status.InitializeConditions()
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			event = model.EventDelete
@@ -264,9 +275,7 @@ func (c *controller) List() []config.Config {
 		if should, err := c.shouldProcessIngress(ing); !should || err != nil {
 			continue
 		}
-
 		copiedConfig := ing.DeepCopy()
-		//setDefaultMSEIngressOptionalField(copiedConfig)
 
 		outConfig := config.Config{
 			Meta: config.Meta{

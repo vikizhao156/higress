@@ -188,7 +188,6 @@ func (m *KIngressConfig) List(typ config.GroupVersionKind, namespace string) ([]
 	case gvk.WasmPlugin:
 		return m.convertWasmPlugin(wrapperConfigs), nil
 	}
-
 	return nil, nil
 }
 
@@ -252,6 +251,11 @@ func (m *KIngressConfig) convertGateways(configs []common.WrapperConfig) []confi
 		if err := ingressController.ConvertGateway(&convertOptions, &cfg); err != nil {
 			IngressLog.Errorf("Convert ingress %s/%s to gateway fail in cluster %s, err %v", cfg.Config.Namespace, cfg.Config.Name, clusterId, err)
 		}
+	}
+
+	// apply annotation
+	for _, wrapperGateway := range convertOptions.Gateways {
+		m.annotationHandler.ApplyGateway(wrapperGateway.Gateway, wrapperGateway.WrapperConfig.AnnotationsConfig)
 	}
 
 	m.mutex.Lock()
