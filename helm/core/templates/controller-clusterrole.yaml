@@ -121,3 +121,6 @@ rules:
   - apiGroups: ["networking.internal.knative.dev"]
     verbs: ["get","list","watch"]
     resources: ["ingresses"]
+  - apiGroups: ["networking.internal.knative.dev"]
+    resources: ["ingresses/status"]
+    verbs: ["get","patch","update"]

@@ -34,12 +34,10 @@ import (
 
 // statusSyncer keeps the status IP in each Ingress resource updated
 type statusSyncer struct {
-	client     kingressclient.Interface
-	controller *controller
-
+	client           kingressclient.Interface
+	controller       *controller
 	watchedNamespace string
-
-	ingressLister kingresslister.IngressLister
+	ingressLister    kingresslister.IngressLister
 	// search service in the mse vpc
 	serviceLister listerv1.ServiceLister
 }
@@ -80,11 +78,14 @@ func (s *statusSyncer) runUpdateStatus() error {
 	}
 
 	IngressLog.Debugf("found number %d of svc", len(svcList))
+	for _, svc := range svcList {
+		IngressLog.Infof(svc.Name, "  ", svc.Namespace)
+	}
 
 	lbStatusList := common2.GetLbStatusList(svcList)
-	if len(lbStatusList) == 0 {
-		return nil
-	}
+	//if len(lbStatusList) == 0 {
+	//	return nil
+	//}
 	return s.updateStatus(lbStatusList)
 }
 
@@ -107,32 +108,22 @@ func (s *statusSyncer) updateStatus(status []coreV1.LoadBalancerIngress) error {
 		return err
 	}
 	for _, ingress := range ingressList {
-
 		shouldTarget, err := s.controller.shouldProcessIngress(ingress)
 		if err != nil {
 			IngressLog.Warnf("error determining whether should target ingress %s/%s within cluster %s for status update: %v",
 				ingress.Namespace, ingress.Name, s.controller.options.ClusterId, err)
 			return err
 		}
-
 		if !shouldTarget {
 			continue
 		}
-
 		ingress.Status.MarkNetworkConfigured()
-
-		curPublicIPs := ingress.Status.PublicLoadBalancer.Ingress
 		KIngressStatus := transportLoadBalancerIngress(status)
-		if reflect.DeepEqual(KIngressStatus, curPublicIPs) {
-			IngressLog.Debugf("skipping update of Ingress %v/%v within cluster %s (no change)",
-				ingress.Namespace, ingress.Name, s.controller.options.ClusterId)
-			continue
+		if ingress.Status.PublicLoadBalancer == nil || len(ingress.Status.PublicLoadBalancer.Ingress) != len(KIngressStatus) || reflect.DeepEqual(ingress.Status.PublicLoadBalancer.Ingress, KIngressStatus) {
+			ingress.Status.ObservedGeneration = ingress.Generation
+			ingress.Status.MarkLoadBalancerReady(KIngressStatus, KIngressStatus)
+			IngressLog.Infof("Update Ingress %v/%v within cluster %s status", ingress.Namespace, ingress.Name, s.controller.options.ClusterId)
 		}
-		ingress.Status.MarkLoadBalancerReady(KIngressStatus, KIngressStatus)
-		ingress.Status.ObservedGeneration = ingress.Generation
-		IngressLog.Infof("Update Ingress %v/%v within cluster %s status",
-			ingress.Namespace, ingress.Name, s.controller.options.ClusterId)
-
 		_, err = s.client.NetworkingV1alpha1().Ingresses(ingress.Namespace).UpdateStatus(context.TODO(), ingress, metaV1.UpdateOptions{})
 		if err != nil {
 			IngressLog.Warnf("error updating ingress %s/%s within cluster %s status: %v",
