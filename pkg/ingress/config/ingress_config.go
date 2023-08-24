@@ -101,7 +101,7 @@ type IngressConfig struct {
 	envoyFilterHandlers     []model.EventHandler
 	serviceEntryHandlers    []model.EventHandler
 	wasmPluginHandlers      []model.EventHandler
-	WatchErrorHandler       cache.WatchErrorHandler
+	watchErrorHandler       cache.WatchErrorHandler
 
 	cachedEnvoyFilters []config.Config
 
@@ -223,7 +223,7 @@ func (m *IngressConfig) AddLocalCluster(options common.Options) common.IngressCo
 }
 
 func (m *IngressConfig) InitializeCluster(ingressController common.IngressController, stop <-chan struct{}) error {
-	_ = ingressController.SetWatchErrorHandler(m.WatchErrorHandler)
+	_ = ingressController.SetWatchErrorHandler(m.watchErrorHandler)
 
 	go ingressController.Run(stop)
 	return nil
@@ -1039,7 +1039,6 @@ func (m *IngressConfig) ReflectSecretChanges(clusterNamespacedName util.ClusterN
 	}
 }
 
-// 这段代码好奇怪
 func normalizeWeightedCluster(cache *common.IngressRouteCache, route *common.WrapperHTTPRoute) {
 	if len(route.HTTPRoute.Route) == 1 {
 		route.HTTPRoute.Route[0].Weight = 100
@@ -1420,7 +1419,7 @@ func (m *IngressConfig) HasSynced() bool {
 }
 
 func (m *IngressConfig) SetWatchErrorHandler(f func(r *cache.Reflector, err error)) error {
-	m.WatchErrorHandler = f
+	m.watchErrorHandler = f
 	return nil
 }
 

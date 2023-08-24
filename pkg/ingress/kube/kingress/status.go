@@ -78,14 +78,7 @@ func (s *statusSyncer) runUpdateStatus() error {
 	}
 
 	IngressLog.Debugf("found number %d of svc", len(svcList))
-	for _, svc := range svcList {
-		IngressLog.Infof(svc.Name, "  ", svc.Namespace)
-	}
-
 	lbStatusList := common2.GetLbStatusList(svcList)
-	//if len(lbStatusList) == 0 {
-	//	return nil
-	//}
 	return s.updateStatus(lbStatusList)
 }
 
