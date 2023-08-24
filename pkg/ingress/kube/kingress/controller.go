@@ -184,13 +184,12 @@ func (c *controller) onEvent(namespacedName types.NamespacedName) error {
 	// we should check need process only when event is not delete,
 	// if it is delete event, and previously processed, we need to process too.
 	if event != model.EventDelete {
-		IngressLog.Infof(ing.Generation)
 		shouldProcess, err := c.shouldProcessIngressUpdate(ing)
 		if err != nil {
 			return err
 		}
 		if !shouldProcess {
-			IngressLog.Infof("no need process, ingress %s", namespacedName)
+			IngressLog.("no need process, ingress %s", namespacedName)
 			return nil
 		}
 	}
