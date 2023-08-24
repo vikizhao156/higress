@@ -308,7 +308,6 @@ func (c *controller) List() []config.Config {
 
 		copiedConfig := ing.DeepCopy()
 		setDefaultMSEIngressOptionalField(copiedConfig)
-		ing.GetAnnotations()
 		outConfig := config.Config{
 			Meta: config.Meta{
 				Name:              copiedConfig.Name,
