@@ -189,7 +189,7 @@ func (c *controller) onEvent(namespacedName types.NamespacedName) error {
 			return err
 		}
 		if !shouldProcess {
-			IngressLog.("no need process, ingress %s", namespacedName)
+			IngressLog.Infof("no need process, ingress %s", namespacedName)
 			return nil
 		}
 	}
