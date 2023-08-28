@@ -20,6 +20,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/alibaba/higress/pkg/ingress/higressconfig"
+	"github.com/alibaba/higress/pkg/ingress/kube/common"
+	"github.com/alibaba/higress/pkg/ingress/mcp"
+	higresskube "github.com/alibaba/higress/pkg/kube"
 	prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -46,11 +50,6 @@ import (
 	"istio.io/pkg/log"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-
-	higressconfig "github.com/alibaba/higress/pkg/ingress/higressconfig"
-	"github.com/alibaba/higress/pkg/ingress/kube/common"
-	"github.com/alibaba/higress/pkg/ingress/mcp"
-	higresskube "github.com/alibaba/higress/pkg/kube"
 )
 
 type XdsOptions struct {

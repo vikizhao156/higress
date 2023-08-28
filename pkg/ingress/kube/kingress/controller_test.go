@@ -16,10 +16,9 @@ package kingress
 
 import (
 	"fmt"
-	"github.com/alibaba/higress/pkg/ingress/kube/annotations"
-	"github.com/alibaba/higress/pkg/ingress/kube/common"
-	"github.com/alibaba/higress/pkg/ingress/kube/secret"
-	"github.com/alibaba/higress/pkg/kube"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	istiov1alpha3 "istio.io/api/networking/v1alpha3"
@@ -31,8 +30,11 @@ import (
 	"knative.dev/networking/pkg/apis/networking/v1alpha1"
 	ingress "knative.dev/networking/pkg/apis/networking/v1alpha1"
 	"knative.dev/pkg/kmeta"
-	"testing"
-	"time"
+
+	"github.com/alibaba/higress/pkg/ingress/kube/annotations"
+	"github.com/alibaba/higress/pkg/ingress/kube/common"
+	"github.com/alibaba/higress/pkg/ingress/kube/secret"
+	"github.com/alibaba/higress/pkg/kube"
 )
 
 const (

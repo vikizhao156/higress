@@ -15,7 +15,6 @@
 package config
 
 import (
-	"fmt"
 	"testing"
 
 	httppb "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
@@ -575,7 +574,6 @@ func TestConvertGatewaysForIngress(t *testing.T) {
 			for _, item := range result {
 				host := common.GetHost(item.Annotations)
 				target[host] = item
-				fmt.Print(item)
 			}
 
 			assert.Equal(t, testCase.expect, target)

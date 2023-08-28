@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	kube "github.com/alibaba/higress/pkg/kube"
+	"github.com/alibaba/higress/pkg/kube"
 	"github.com/hashicorp/go-multierror"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/model"
@@ -35,11 +35,6 @@ import (
 	"istio.io/istio/pkg/config/protocol"
 	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/kube/controllers"
-
-	"github.com/alibaba/higress/pkg/ingress/kube/common"
-	"github.com/alibaba/higress/pkg/ingress/kube/kingress/resources"
-	"github.com/alibaba/higress/pkg/ingress/kube/secret"
-	. "github.com/alibaba/higress/pkg/ingress/log"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -50,6 +45,11 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ingress "knative.dev/networking/pkg/apis/networking/v1alpha1"
 	networkingv1alpha1 "knative.dev/networking/pkg/client/listers/networking/v1alpha1"
+
+	"github.com/alibaba/higress/pkg/ingress/kube/common"
+	"github.com/alibaba/higress/pkg/ingress/kube/kingress/resources"
+	"github.com/alibaba/higress/pkg/ingress/kube/secret"
+	. "github.com/alibaba/higress/pkg/ingress/log"
 )
 
 var (
@@ -59,7 +59,7 @@ var (
 const (
 	// ClassAnnotationKey points to the annotation for the class of this resource.
 	ClassAnnotationKey    = "networking.knative.dev/ingress.class"
-	IstioIngressClassName = "istio.ingress.networking.knative.dev"
+	IstioIngressClassName = "higress.ingress.networking.knative.dev"
 )
 
 type controller struct {

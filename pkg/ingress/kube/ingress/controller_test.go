@@ -16,7 +16,6 @@ package ingress
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -423,8 +422,7 @@ func testConvertHTTPRoute(t *testing.T, c common.IngressController) {
 		},
 	}
 
-	for i, testcase := range testcases {
-		fmt.Print("testcase-", i)
+	for _, testcase := range testcases {
 		err := c.ConvertHTTPRoute(testcase.input.options, testcase.input.wrapperConfig)
 		if err != nil {
 			require.Equal(t, testcase.expectNoError, false)

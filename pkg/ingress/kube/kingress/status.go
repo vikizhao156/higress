@@ -16,12 +16,9 @@ package kingress
 
 import (
 	"context"
-	common2 "github.com/alibaba/higress/pkg/ingress/kube/common"
-	. "github.com/alibaba/higress/pkg/ingress/log"
 	"reflect"
 	"time"
 
-	"github.com/alibaba/higress/pkg/kube"
 	coreV1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,6 +27,10 @@ import (
 	"knative.dev/networking/pkg/apis/networking/v1alpha1"
 	kingressclient "knative.dev/networking/pkg/client/clientset/versioned"
 	kingresslister "knative.dev/networking/pkg/client/listers/networking/v1alpha1"
+
+	common2 "github.com/alibaba/higress/pkg/ingress/kube/common"
+	. "github.com/alibaba/higress/pkg/ingress/log"
+	"github.com/alibaba/higress/pkg/kube"
 )
 
 // statusSyncer keeps the status IP in each Ingress resource updated

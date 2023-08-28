@@ -16,18 +16,19 @@ package config
 
 import (
 	"fmt"
-	"github.com/alibaba/higress/pkg/ingress/kube/annotations"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"testing"
 
-	"github.com/alibaba/higress/pkg/ingress/kube/common"
-	kcontrollerv1 "github.com/alibaba/higress/pkg/ingress/kube/kingress"
-	"github.com/alibaba/higress/pkg/kube"
 	"github.com/stretchr/testify/assert"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/istio/pkg/config"
 	"istio.io/istio/pkg/config/schema/gvk"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ingress "knative.dev/networking/pkg/apis/networking/v1alpha1"
+
+	"github.com/alibaba/higress/pkg/ingress/kube/annotations"
+	"github.com/alibaba/higress/pkg/ingress/kube/common"
+	kcontrollerv1 "github.com/alibaba/higress/pkg/ingress/kube/kingress"
+	"github.com/alibaba/higress/pkg/kube"
 )
 
 func TestNormalizeKWeightedCluster(t *testing.T) {

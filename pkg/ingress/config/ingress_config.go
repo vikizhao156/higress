@@ -380,7 +380,6 @@ func (m *IngressConfig) convertGateways(configs []common.WrapperConfig) []config
 			},
 			Spec: gateway.Gateway,
 		})
-
 	}
 	return out
 }

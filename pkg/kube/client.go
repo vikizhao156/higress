@@ -17,28 +17,27 @@ package kube
 import (
 	"context"
 	"fmt"
-	"github.com/alibaba/higress/pkg/config/constants"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 	"reflect"
 	"time"
+
+	"go.uber.org/atomic"
+	istiokube "istio.io/istio/pkg/kube"
+	apiExtensionsV1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/clientcmd"
+	kingressclient "knative.dev/networking/pkg/client/clientset/versioned"
+	kingressfake "knative.dev/networking/pkg/client/clientset/versioned/fake"
+	kingressinformer "knative.dev/networking/pkg/client/informers/externalversions"
 
 	higressclient "github.com/alibaba/higress/client/pkg/clientset/versioned"
 	higressfake "github.com/alibaba/higress/client/pkg/clientset/versioned/fake"
 	higressinformer "github.com/alibaba/higress/client/pkg/informers/externalversions"
-
-	"go.uber.org/atomic"
-	istiokube "istio.io/istio/pkg/kube"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
-	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/clientcmd"
-
-	apiExtensionsV1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
-	kingressclient "knative.dev/networking/pkg/client/clientset/versioned"
-	kingressfake "knative.dev/networking/pkg/client/clientset/versioned/fake"
-	kingressinformer "knative.dev/networking/pkg/client/informers/externalversions"
+	"github.com/alibaba/higress/pkg/config/constants"
 )
 
 type Client interface {
