@@ -359,15 +359,25 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 				if c.options.GatewaySelectorKey != "" {
 					wrapperGateway.Gateway.Selector = map[string]string{c.options.GatewaySelectorKey: c.options.GatewaySelectorValue}
 				}
-
-				wrapperGateway.Gateway.Servers = append(wrapperGateway.Gateway.Servers, &networking.Server{
-					Port: &networking.Port{
-						Number:   80,
-						Protocol: string(protocol.HTTP),
-						Name:     common.CreateConvertedName("http-80-ingress", c.options.ClusterId, cfg.Namespace, cfg.Name, cleanHost),
-					},
-					Hosts: []string{ruleHost},
-				})
+				if rule.Visibility == ingress.IngressVisibilityClusterLocal {
+					wrapperGateway.Gateway.Servers = append(wrapperGateway.Gateway.Servers, &networking.Server{
+						Port: &networking.Port{
+							Number:   8081,
+							Protocol: string(protocol.HTTP),
+							Name:     common.CreateConvertedName("http-8081-ingress", c.options.ClusterId, cfg.Namespace, cfg.Name, cleanHost),
+						},
+						Hosts: []string{ruleHost},
+					})
+				} else {
+					wrapperGateway.Gateway.Servers = append(wrapperGateway.Gateway.Servers, &networking.Server{
+						Port: &networking.Port{
+							Number:   80,
+							Protocol: string(protocol.HTTP),
+							Name:     common.CreateConvertedName("http-80-ingress", c.options.ClusterId, cfg.Namespace, cfg.Name, cleanHost),
+						},
+						Hosts: []string{ruleHost},
+					})
+				}
 
 				// Add new gateway, builder
 				convertOptions.Gateways[ruleHost] = wrapperGateway
