@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package higressconfig
+package ingresstranslation
 
 import (
 	"sync"
@@ -23,18 +23,18 @@ import (
 	"istio.io/istio/pkg/config/schema/gvk"
 	"k8s.io/client-go/tools/cache"
 
-	ingressconfig "github.com/alibaba/higress/pkg/ingress/config"
+	ingressconfig "github.com/alibaba/higress/pkg/ingress/ingresstranslation/config"
 	"github.com/alibaba/higress/pkg/ingress/kube/common"
 	. "github.com/alibaba/higress/pkg/ingress/log"
 	"github.com/alibaba/higress/pkg/kube"
 )
 
 var (
-	_ model.ConfigStoreCache = &HigressConfig{}
-	_ model.IngressStore     = &HigressConfig{}
+	_ model.ConfigStoreCache = &IngressTranslation{}
+	_ model.IngressStore     = &IngressTranslation{}
 )
 
-type HigressConfig struct {
+type IngressTranslation struct {
 	ingressconfig      *ingressconfig.IngressConfig
 	kingressconfig     *ingressconfig.KIngressConfig
 	mutex              sync.RWMutex
@@ -42,25 +42,25 @@ type HigressConfig struct {
 	higressDomainCache model.IngressDomainCollection
 }
 
-func NewHigressConfig(localKubeClient kube.Client, XDSUpdater model.XDSUpdater, namespace, clusterId string) *HigressConfig {
+func NewIngressTranslation(localKubeClient kube.Client, XDSUpdater model.XDSUpdater, namespace, clusterId string) *IngressTranslation {
 	if clusterId == "Kubernetes" {
 		clusterId = ""
 	}
-	config := &HigressConfig{
+	config := &IngressTranslation{
 		ingressconfig:  ingressconfig.NewIngressConfig(localKubeClient, XDSUpdater, namespace, clusterId),
 		kingressconfig: ingressconfig.NewKIngressConfig(localKubeClient, XDSUpdater, namespace, clusterId),
 	}
 	return config
 }
 
-func (m *HigressConfig) AddLocalCluster(options common.Options) (common.IngressController, common.KIngressController) {
+func (m *IngressTranslation) AddLocalCluster(options common.Options) (common.IngressController, common.KIngressController) {
 	if m.kingressconfig == nil {
 		return m.ingressconfig.AddLocalCluster(options), nil
 	}
 	return m.ingressconfig.AddLocalCluster(options), m.kingressconfig.AddLocalCluster(options)
 }
 
-func (m *HigressConfig) InitializeCluster(ingressController common.IngressController, kingressController common.KIngressController, stop <-chan struct{}) error {
+func (m *IngressTranslation) InitializeCluster(ingressController common.IngressController, kingressController common.KIngressController, stop <-chan struct{}) error {
 	if err := m.ingressconfig.InitializeCluster(ingressController, stop); err != nil {
 		return err
 	}
@@ -73,14 +73,14 @@ func (m *HigressConfig) InitializeCluster(ingressController common.IngressContro
 	return nil
 }
 
-func (m *HigressConfig) RegisterEventHandler(kind config.GroupVersionKind, f model.EventHandler) {
+func (m *IngressTranslation) RegisterEventHandler(kind config.GroupVersionKind, f model.EventHandler) {
 	m.ingressconfig.RegisterEventHandler(kind, f)
 	if m.kingressconfig != nil {
 		m.kingressconfig.RegisterEventHandler(kind, f)
 	}
 }
 
-func (m *HigressConfig) HasSynced() bool {
+func (m *IngressTranslation) HasSynced() bool {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	if !m.ingressconfig.HasSynced() {
@@ -95,14 +95,14 @@ func (m *HigressConfig) HasSynced() bool {
 	return true
 }
 
-func (m *HigressConfig) Run(stop <-chan struct{}) {
+func (m *IngressTranslation) Run(stop <-chan struct{}) {
 	go m.ingressconfig.Run(stop)
 	if m.kingressconfig != nil {
 		go m.kingressconfig.Run(stop)
 	}
 }
 
-func (m *HigressConfig) SetWatchErrorHandler(f func(r *cache.Reflector, err error)) error {
+func (m *IngressTranslation) SetWatchErrorHandler(f func(r *cache.Reflector, err error)) error {
 	m.ingressconfig.SetWatchErrorHandler(f)
 	if m.kingressconfig != nil {
 		m.kingressconfig.SetWatchErrorHandler(f)
@@ -110,7 +110,7 @@ func (m *HigressConfig) SetWatchErrorHandler(f func(r *cache.Reflector, err erro
 	return nil
 }
 
-func (m *HigressConfig) GetIngressRoutes() model.IngressRouteCollection {
+func (m *IngressTranslation) GetIngressRoutes() model.IngressRouteCollection {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	ingressRouteCache := m.ingressconfig.GetIngressRoutes()
@@ -127,7 +127,7 @@ func (m *HigressConfig) GetIngressRoutes() model.IngressRouteCollection {
 
 }
 
-func (m *HigressConfig) GetIngressDomains() model.IngressDomainCollection {
+func (m *IngressTranslation) GetIngressDomains() model.IngressDomainCollection {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	ingressDomainCache := m.ingressconfig.GetIngressDomains()
@@ -143,15 +143,15 @@ func (m *HigressConfig) GetIngressDomains() model.IngressDomainCollection {
 	return m.higressDomainCache
 }
 
-func (m *HigressConfig) Schemas() collection.Schemas {
+func (m *IngressTranslation) Schemas() collection.Schemas {
 	return common.IngressIR
 }
 
-func (m *HigressConfig) Get(typ config.GroupVersionKind, name, namespace string) *config.Config {
+func (m *IngressTranslation) Get(typ config.GroupVersionKind, name, namespace string) *config.Config {
 	return nil
 }
 
-func (m *HigressConfig) List(typ config.GroupVersionKind, namespace string) ([]config.Config, error) {
+func (m *IngressTranslation) List(typ config.GroupVersionKind, namespace string) ([]config.Config, error) {
 	if typ != gvk.Gateway &&
 		typ != gvk.VirtualService &&
 		typ != gvk.DestinationRule &&
@@ -183,22 +183,22 @@ func (m *HigressConfig) List(typ config.GroupVersionKind, namespace string) ([]c
 	return higressConfig, nil
 }
 
-func (m *HigressConfig) Create(config config.Config) (revision string, err error) {
+func (m *IngressTranslation) Create(config config.Config) (revision string, err error) {
 	return "", common.ErrUnsupportedOp
 }
 
-func (m *HigressConfig) Update(config config.Config) (newRevision string, err error) {
+func (m *IngressTranslation) Update(config config.Config) (newRevision string, err error) {
 	return "", common.ErrUnsupportedOp
 }
 
-func (m *HigressConfig) UpdateStatus(config config.Config) (newRevision string, err error) {
+func (m *IngressTranslation) UpdateStatus(config config.Config) (newRevision string, err error) {
 	return "", common.ErrUnsupportedOp
 }
 
-func (m *HigressConfig) Patch(orig config.Config, patchFn config.PatchFunc) (string, error) {
+func (m *IngressTranslation) Patch(orig config.Config, patchFn config.PatchFunc) (string, error) {
 	return "", common.ErrUnsupportedOp
 }
 
-func (m *HigressConfig) Delete(typ config.GroupVersionKind, name, namespace string, resourceVersion *string) error {
+func (m *IngressTranslation) Delete(typ config.GroupVersionKind, name, namespace string, resourceVersion *string) error {
 	return common.ErrUnsupportedOp
 }

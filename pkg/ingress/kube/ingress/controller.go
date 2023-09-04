@@ -117,7 +117,6 @@ func NewController(localKubeClient, client kubeclient.Client, options common.Opt
 
 	handler := controllers.LatestVersionHandlerFuncs(controllers.EnqueueForSelf(q))
 	c.ingressInformer.AddEventHandler(handler)
-
 	if options.EnableStatus {
 		c.statusSyncer = newStatusSyncer(localKubeClient, client, c, options.SystemNamespace)
 	} else {

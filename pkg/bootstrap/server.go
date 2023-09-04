@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/alibaba/higress/pkg/ingress/higressconfig"
+	"github.com/alibaba/higress/pkg/ingress/ingresstranslation"
 	"github.com/alibaba/higress/pkg/ingress/kube/common"
 	"github.com/alibaba/higress/pkg/ingress/mcp"
 	higresskube "github.com/alibaba/higress/pkg/kube"
@@ -225,7 +225,7 @@ func (s *Server) initConfigController() error {
 		options.ClusterId = ""
 	}
 
-	ingressConfig := higressconfig.NewHigressConfig(s.kubeClient, s.xdsServer, ns, options.ClusterId)
+	ingressConfig := ingresstranslation.NewIngressTranslation(s.kubeClient, s.xdsServer, ns, options.ClusterId)
 	ingressController, kingressController := ingressConfig.AddLocalCluster(options)
 
 	s.configStores = append(s.configStores, ingressConfig)
