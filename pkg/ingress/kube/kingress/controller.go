@@ -578,10 +578,6 @@ func (c *controller) ConvertHTTPRoute(convertOptions *common.ConvertOptions, wra
 			routes := convertOptions.HTTPRoutes[rulehost]
 			IngressLog.Debugf("routes of host %s is %v", rulehost, routes)
 			common.SortHTTPRoutes(routes)
-			for i, route := range routes {
-				fmt.Print("number", i, "----HTTPRoute-----", route.HTTPRoute, "\n")
-			}
-
 		}
 
 	}

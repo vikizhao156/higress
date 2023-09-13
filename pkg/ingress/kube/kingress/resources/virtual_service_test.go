@@ -168,7 +168,7 @@ func TestMakeVirtualServiceRoute_Internal(t *testing.T) {
 			Percent: 100,
 		}},
 	}
-	route := MakeVirtualServiceRoute(sets.NewString("a.default", "a.default.svc", "a.default.svc.cluster.local"), ingressPath)
+	route := MakeVirtualServiceRoute(sets.NewString("a.default"), ingressPath)
 	expected := &istiov1alpha3.HTTPRoute{
 		Retries: &istiov1alpha3.HTTPRetry{},
 		Match: []*istiov1alpha3.HTTPMatchRequest{{

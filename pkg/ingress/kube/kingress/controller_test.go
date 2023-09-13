@@ -15,7 +15,6 @@
 package kingress
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -39,7 +38,7 @@ import (
 
 const (
 	testNS                    = "testNS"
-	IstioIngressClassNametest = "istio.ingress.networking.knative.dev"
+	IstioIngressClassNametest = "higress"
 )
 
 var (
@@ -446,8 +445,7 @@ func testConvertHTTPRoute(t *testing.T, c common.KIngressController) {
 		},
 	}
 
-	for i, testcase := range testcases {
-		fmt.Print("testcase-", i, "\n")
+	for _, testcase := range testcases {
 		err := c.ConvertHTTPRoute(testcase.input.options, testcase.input.wrapperConfig)
 		if err != nil {
 			require.Equal(t, testcase.expectNoError, false)
@@ -511,6 +509,7 @@ func TestShouldProcessIngressUpdate(t *testing.T) {
 		ingresses: make(map[string]*ingress.Ingress),
 	}
 	ingress1 := &ingress.Ingress{
+
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-1",
 		},
