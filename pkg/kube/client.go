@@ -50,9 +50,9 @@ type Client interface {
 	HigressInformer() higressinformer.SharedInformerFactory
 
 	//KIngress return the Knative kube client
-	Kingress() kingressclient.Interface
+	KIngress() kingressclient.Interface
 
-	KingressInformer() kingressinformer.SharedInformerFactory
+	KIngressInformer() kingressinformer.SharedInformerFactory
 }
 
 type client struct {
@@ -160,11 +160,11 @@ func NewClient(clientConfig clientcmd.ClientConfig) (Client, error) {
 	return &c, nil
 }
 
-func (c *client) Kingress() kingressclient.Interface {
+func (c *client) KIngress() kingressclient.Interface {
 	return c.kingress
 }
 
-func (c *client) KingressInformer() kingressinformer.SharedInformerFactory {
+func (c *client) KIngressInformer() kingressinformer.SharedInformerFactory {
 	return c.kingressInformer
 }
 

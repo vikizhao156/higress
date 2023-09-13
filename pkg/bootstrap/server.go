@@ -20,9 +20,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/alibaba/higress/pkg/ingress/ingresstranslation"
 	"github.com/alibaba/higress/pkg/ingress/kube/common"
 	"github.com/alibaba/higress/pkg/ingress/mcp"
+	"github.com/alibaba/higress/pkg/ingress/translation"
 	higresskube "github.com/alibaba/higress/pkg/kube"
 	prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
@@ -225,7 +225,7 @@ func (s *Server) initConfigController() error {
 		options.ClusterId = ""
 	}
 
-	ingressConfig := ingresstranslation.NewIngressTranslation(s.kubeClient, s.xdsServer, ns, options.ClusterId)
+	ingressConfig := translation.NewIngressTranslation(s.kubeClient, s.xdsServer, ns, options.ClusterId)
 	ingressController, kingressController := ingressConfig.AddLocalCluster(options)
 
 	s.configStores = append(s.configStores, ingressConfig)

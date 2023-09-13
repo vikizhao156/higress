@@ -39,17 +39,16 @@ type statusSyncer struct {
 	controller       *controller
 	watchedNamespace string
 	ingressLister    kingresslister.IngressLister
-	// search service in the mse vpc
-	serviceLister listerv1.ServiceLister
+	serviceLister    listerv1.ServiceLister
 }
 
 // newStatusSyncer creates a new instance
 func newStatusSyncer(localKubeClient, client kube.Client, controller *controller, namespace string) *statusSyncer {
 	return &statusSyncer{
-		client:           client.Kingress(),
+		client:           client.KIngress(),
 		controller:       controller,
 		watchedNamespace: namespace,
-		ingressLister:    client.KingressInformer().Networking().V1alpha1().Ingresses().Lister(),
+		ingressLister:    client.KIngressInformer().Networking().V1alpha1().Ingresses().Lister(),
 		// search service in the mse vpc
 		serviceLister: localKubeClient.KubeInformer().Core().V1().Services().Lister(),
 	}

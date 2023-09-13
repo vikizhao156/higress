@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ingresstranslation
+package translation
 
 import (
 	"sync"
@@ -23,9 +23,9 @@ import (
 	"istio.io/istio/pkg/config/schema/gvk"
 	"k8s.io/client-go/tools/cache"
 
-	ingressconfig "github.com/alibaba/higress/pkg/ingress/ingresstranslation/config"
 	"github.com/alibaba/higress/pkg/ingress/kube/common"
 	. "github.com/alibaba/higress/pkg/ingress/log"
+	ingressconfig "github.com/alibaba/higress/pkg/ingress/translation/config"
 	"github.com/alibaba/higress/pkg/kube"
 )
 
@@ -35,8 +35,8 @@ var (
 )
 
 type IngressTranslation struct {
-	ingressconfig      *ingressconfig.IngressConfig
-	kingressconfig     *ingressconfig.KIngressConfig
+	ingressConfig      *ingressconfig.IngressConfig
+	kingressConfig     *ingressconfig.KIngressConfig
 	mutex              sync.RWMutex
 	higressRouteCache  model.IngressRouteCollection
 	higressDomainCache model.IngressDomainCollection
@@ -46,48 +46,48 @@ func NewIngressTranslation(localKubeClient kube.Client, XDSUpdater model.XDSUpda
 	if clusterId == "Kubernetes" {
 		clusterId = ""
 	}
-	config := &IngressTranslation{
-		ingressconfig:  ingressconfig.NewIngressConfig(localKubeClient, XDSUpdater, namespace, clusterId),
-		kingressconfig: ingressconfig.NewKIngressConfig(localKubeClient, XDSUpdater, namespace, clusterId),
+	Config := &IngressTranslation{
+		ingressConfig:  ingressconfig.NewIngressConfig(localKubeClient, XDSUpdater, namespace, clusterId),
+		kingressConfig: ingressconfig.NewKIngressConfig(localKubeClient, XDSUpdater, namespace, clusterId),
 	}
-	return config
+	return Config
 }
 
 func (m *IngressTranslation) AddLocalCluster(options common.Options) (common.IngressController, common.KIngressController) {
-	if m.kingressconfig == nil {
-		return m.ingressconfig.AddLocalCluster(options), nil
+	if m.kingressConfig == nil {
+		return m.ingressConfig.AddLocalCluster(options), nil
 	}
-	return m.ingressconfig.AddLocalCluster(options), m.kingressconfig.AddLocalCluster(options)
+	return m.ingressConfig.AddLocalCluster(options), m.kingressConfig.AddLocalCluster(options)
 }
 
 func (m *IngressTranslation) InitializeCluster(ingressController common.IngressController, kingressController common.KIngressController, stop <-chan struct{}) error {
-	if err := m.ingressconfig.InitializeCluster(ingressController, stop); err != nil {
+	if err := m.ingressConfig.InitializeCluster(ingressController, stop); err != nil {
 		return err
 	}
 	if kingressController == nil {
 		return nil
 	}
-	if err := m.kingressconfig.InitializeCluster(kingressController, stop); err != nil {
+	if err := m.kingressConfig.InitializeCluster(kingressController, stop); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (m *IngressTranslation) RegisterEventHandler(kind config.GroupVersionKind, f model.EventHandler) {
-	m.ingressconfig.RegisterEventHandler(kind, f)
-	if m.kingressconfig != nil {
-		m.kingressconfig.RegisterEventHandler(kind, f)
+	m.ingressConfig.RegisterEventHandler(kind, f)
+	if m.kingressConfig != nil {
+		m.kingressConfig.RegisterEventHandler(kind, f)
 	}
 }
 
 func (m *IngressTranslation) HasSynced() bool {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
-	if !m.ingressconfig.HasSynced() {
+	if !m.ingressConfig.HasSynced() {
 		return false
 	}
-	if m.kingressconfig != nil {
-		if !m.kingressconfig.HasSynced() {
+	if m.kingressConfig != nil {
+		if !m.kingressConfig.HasSynced() {
 			return false
 		}
 	}
@@ -96,16 +96,16 @@ func (m *IngressTranslation) HasSynced() bool {
 }
 
 func (m *IngressTranslation) Run(stop <-chan struct{}) {
-	go m.ingressconfig.Run(stop)
-	if m.kingressconfig != nil {
-		go m.kingressconfig.Run(stop)
+	go m.ingressConfig.Run(stop)
+	if m.kingressConfig != nil {
+		go m.kingressConfig.Run(stop)
 	}
 }
 
 func (m *IngressTranslation) SetWatchErrorHandler(f func(r *cache.Reflector, err error)) error {
-	m.ingressconfig.SetWatchErrorHandler(f)
-	if m.kingressconfig != nil {
-		m.kingressconfig.SetWatchErrorHandler(f)
+	m.ingressConfig.SetWatchErrorHandler(f)
+	if m.kingressConfig != nil {
+		m.kingressConfig.SetWatchErrorHandler(f)
 	}
 	return nil
 }
@@ -113,12 +113,12 @@ func (m *IngressTranslation) SetWatchErrorHandler(f func(r *cache.Reflector, err
 func (m *IngressTranslation) GetIngressRoutes() model.IngressRouteCollection {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
-	ingressRouteCache := m.ingressconfig.GetIngressRoutes()
+	ingressRouteCache := m.ingressConfig.GetIngressRoutes()
 	m.higressRouteCache = model.IngressRouteCollection{}
 	m.higressRouteCache.Invalid = append(m.higressRouteCache.Invalid, ingressRouteCache.Invalid...)
 	m.higressRouteCache.Valid = append(m.higressRouteCache.Valid, ingressRouteCache.Valid...)
-	if m.kingressconfig != nil {
-		kingressRouteCache := m.kingressconfig.GetIngressRoutes()
+	if m.kingressConfig != nil {
+		kingressRouteCache := m.kingressConfig.GetIngressRoutes()
 		m.higressRouteCache.Invalid = append(m.higressRouteCache.Invalid, kingressRouteCache.Invalid...)
 		m.higressRouteCache.Valid = append(m.higressRouteCache.Valid, kingressRouteCache.Valid...)
 	}
@@ -130,13 +130,13 @@ func (m *IngressTranslation) GetIngressRoutes() model.IngressRouteCollection {
 func (m *IngressTranslation) GetIngressDomains() model.IngressDomainCollection {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
-	ingressDomainCache := m.ingressconfig.GetIngressDomains()
+	ingressDomainCache := m.ingressConfig.GetIngressDomains()
 
 	m.higressDomainCache = model.IngressDomainCollection{}
 	m.higressDomainCache.Invalid = append(m.higressDomainCache.Invalid, ingressDomainCache.Invalid...)
 	m.higressDomainCache.Valid = append(m.higressDomainCache.Valid, ingressDomainCache.Valid...)
-	if m.kingressconfig != nil {
-		kingressDomainCache := m.kingressconfig.GetIngressDomains()
+	if m.kingressConfig != nil {
+		kingressDomainCache := m.kingressConfig.GetIngressDomains()
 		m.higressDomainCache.Invalid = append(m.higressDomainCache.Invalid, kingressDomainCache.Invalid...)
 		m.higressDomainCache.Valid = append(m.higressDomainCache.Valid, kingressDomainCache.Valid...)
 	}
@@ -167,14 +167,14 @@ func (m *IngressTranslation) List(typ config.GroupVersionKind, namespace string)
 		return nil, common.ErrUnsupportedOp
 	}
 
-	ingressConfig, err := m.ingressconfig.List(typ, namespace)
+	ingressConfig, err := m.ingressConfig.List(typ, namespace)
 	if err != nil {
 		return nil, err
 	}
 	var higressConfig []config.Config
 	higressConfig = append(higressConfig, ingressConfig...)
-	if m.kingressconfig != nil {
-		kingressConfig, err := m.kingressconfig.List(typ, namespace)
+	if m.kingressConfig != nil {
+		kingressConfig, err := m.kingressConfig.List(typ, namespace)
 		if err != nil {
 			return nil, err
 		}

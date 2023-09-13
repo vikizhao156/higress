@@ -58,8 +58,8 @@ var (
 
 const (
 	// ClassAnnotationKey points to the annotation for the class of this resource.
-	ClassAnnotationKey    = "networking.knative.dev/ingress.class"
-	IstioIngressClassName = "higress.ingress.networking.knative.dev"
+	ClassAnnotationKey = "networking.knative.dev/ingress.class"
+	IngressClassName   = "higress"
 )
 
 type controller struct {
@@ -88,7 +88,7 @@ func NewController(localKubeClient, client kube.Client, options common.Options,
 	q := workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())
 
 	//var namespace string = "default"
-	ingressInformer := client.KingressInformer().Networking().V1alpha1().Ingresses()
+	ingressInformer := client.KIngressInformer().Networking().V1alpha1().Ingresses()
 	serviceInformer := client.KubeInformer().Core().V1().Services()
 
 	c := &controller{
@@ -368,6 +368,7 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 						},
 						Hosts: []string{ruleHost},
 					})
+
 				} else {
 					wrapperGateway.Gateway.Servers = append(wrapperGateway.Gateway.Servers, &networking.Server{
 						Port: &networking.Port{
@@ -597,20 +598,20 @@ func (c *controller) IngressRouteBuilderServicesCheck(httppath *ingress.HTTPIngr
 		if split.ServiceName == "" {
 			return common.InvalidBackendService
 		}
-		new1 := model.BackendService{
+		backendService := model.BackendService{
 			Namespace: namespace,
 			Name:      split.ServiceName,
 			Port:      uint32(split.ServicePort.IntValue()),
 			Weight:    int32(split.Percent),
 		}
-		builder.ServiceList = append(builder.ServiceList, new1)
+		builder.ServiceList = append(builder.ServiceList, backendService)
 	}
 	return common.Normal
 }
 
 func (c *controller) shouldProcessIngressWithClass(ing *ingress.Ingress) bool {
-	if classValue, found := ing.GetAnnotations()[ClassAnnotationKey]; !found || classValue != IstioIngressClassName {
-		IngressLog.Debugf("Ingress class %s does not match knative IngressCLassName %s.", ClassAnnotationKey, classValue+"!="+IstioIngressClassName)
+	if classValue, found := ing.GetAnnotations()[ClassAnnotationKey]; !found || classValue != IngressClassName {
+		IngressLog.Debugf("Ingress class %s does not match knative IngressCLassName %s.", classValue, IngressClassName)
 		return false
 	}
 	return true
